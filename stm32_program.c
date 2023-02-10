@@ -88,18 +88,111 @@ VL53L0X_Dev_t  vl53l0x_l; // lewy
 
 VL53L0X_DEV    Dev = &vl53l0x_p;
 
-
+int flaga_startu=0;
+int flaga_startu2=0;
 int status;
 
 uint8_t Message[64];
 uint8_t MessageLen;
 
+uint16_t ticksy=0;
+
+volatile static uint16_t value[2];// pomiar adc tablica 2 elementowa
+volatile static uint16_t value_calib[2];// progi dla czujnikow krawedziowych
+
+void fun_namierz(void){
+
+	HAL_TIM_Base_Start_IT(&htim11);
+
+
+}
+
+
 
 // Override the weak call back function
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-      if (htim->Instance == TIM11) {
-  	  		  MessageLen = sprintf((char*)Message, "pelny timer: %i\n\r",TIM11);
-  	  		  HAL_UART_Transmit(&huart1, Message, MessageLen, 100);      }
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+
+      if (htim->Instance == TIM11)
+      {
+
+
+    	  if (flaga_startu)
+		  {
+
+    	  		MessageLen = sprintf((char*)Message, "tiksy przed, i jazda: %i\n\r",ticksy);
+    	  	  	HAL_UART_Transmit(&huart1, Message, MessageLen, 100);
+
+
+    	  	  	if(!(value[1]<=value_calib[0]))
+    	  	  	{
+    	  	  		//jazda w prawo
+					HAL_GPIO_WritePin(motor_2B_GPIO_Port, motor_2B_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(motor_1B_GPIO_Port, motor_1B_Pin, GPIO_PIN_RESET);
+
+    	  	  	}else
+    	  	  	{
+    	  			HAL_GPIO_WritePin(motor_2B_GPIO_Port, motor_2B_Pin, GPIO_PIN_SET);
+    	  			HAL_GPIO_WritePin(motor_1B_GPIO_Port, motor_1B_Pin, GPIO_PIN_SET);
+
+    	  	  	}
+
+
+    	  		if(ticksy>=65)
+    	  		{
+    	  			//STOP
+    	  			MessageLen = sprintf((char*)Message, "zatrzymanie %i\n\r",ticksy);
+    	  	  		HAL_UART_Transmit(&huart1, Message, MessageLen, 100);
+
+
+    	  			HAL_GPIO_WritePin(motor_2B_GPIO_Port, motor_2B_Pin, GPIO_PIN_SET);
+    	  			HAL_GPIO_WritePin(motor_1B_GPIO_Port, motor_1B_Pin, GPIO_PIN_SET);
+
+    	  			ticksy=0; // wyzeruj ticksy
+    	  			flaga_startu=0;
+    	  		}
+
+    	  		ticksy=ticksy+1;
+    	  }
+////////////////////////////////////////////////////////////////////////////////////////////////////
+    	  if (flaga_startu2)
+		  {
+
+    		  if(!(value[0]<=value_calib[0]))
+    			  {
+    			  //JAZDA w lewo (patrzac od kierowcy
+    			  HAL_GPIO_WritePin(motor_1A_GPIO_Port, motor_1A_Pin, GPIO_PIN_SET);
+    			  HAL_GPIO_WritePin(motor_2A_GPIO_Port, motor_2A_Pin, GPIO_PIN_RESET);
+    			  }else{
+      				HAL_GPIO_WritePin(motor_1A_GPIO_Port, motor_1A_Pin, GPIO_PIN_SET);
+      				HAL_GPIO_WritePin(motor_2A_GPIO_Port, motor_2A_Pin, GPIO_PIN_SET);
+    			  }
+
+
+
+
+    	  		if(ticksy>=65)
+    	  		{
+    	  			//STOP
+    	  			MessageLen = sprintf((char*)Message, "zatrzymanie %i\n\r",ticksy);
+    	  	  		HAL_UART_Transmit(&huart1, Message, MessageLen, 100);
+
+
+    				HAL_GPIO_WritePin(motor_1A_GPIO_Port, motor_1A_Pin, GPIO_PIN_SET);
+    				HAL_GPIO_WritePin(motor_2A_GPIO_Port, motor_2A_Pin, GPIO_PIN_SET);
+
+    	  			ticksy=0; // wyzeruj ticksy
+    	  			flaga_startu2=0;
+    	  		}
+
+    	  		ticksy=ticksy+1;
+    	  }
+
+
+
+
+      }
+
 }
 
 
@@ -124,8 +217,7 @@ int main(void)
     uint8_t VhvSettings;
     uint8_t PhaseCal;
 
-    volatile static uint16_t value[2];// pomiar adc tablica 2 elementowa
-    uint16_t value_calib[2];// progi dla czujnikow krawedziowych
+
     volatile static uint16_t sensor_left_dist;
     volatile static uint16_t sensor_center_dist;
     volatile static uint16_t sensor_right_dist;
@@ -295,13 +387,7 @@ int main(void)
         //
 
 
-   //  HAL_GPIO_WritePin(x_lewy_GPIO_Port, x_lewy_Pin, GPIO_PIN_SET); // Enable XSHUT
-    // HAL_GPIO_WritePin(x_srodek_GPIO_Port,x_srodek_Pin , GPIO_PIN_SET); // Enable XSHUT
 
-  //   HAL_GPIO_WritePin(x_lewy_GPIO_Port, x_lewy_Pin, GPIO_PIN_RESET); // Enable XSHUT
-   //  HAL_GPIO_WritePin(x_srodek_GPIO_Port,x_srodek_Pin , GPIO_PIN_SET); // Enable XSHUT
-   //  HAL_GPIO_WritePin(x_prawy_GPIO_Port,x_prawy_Pin, GPIO_PIN_SET); // Enable XSHUT
-   //  HAL_Delay(20);
 
 
   /* USER CODE END 2 */
@@ -318,7 +404,7 @@ int main(void)
   		value_calib[0]=value[0]/2; // tu wprowadzic zmienna
   		value_calib[1]=value[1]/2; //// tu wprowadzic zmienna
 
-  	 	MessageLen = sprintf((char*)Message, "calib prog 1=%u, calib prog 2=%u\n",value[0], value[1]);
+  	 	MessageLen = sprintf((char*)Message, "calib prog 1=%u, calib prog 2=%u\n",value_calib[0], value_calib[1]);
   		HAL_UART_Transmit(&huart1, Message, MessageLen, 100);
 
 
@@ -399,7 +485,7 @@ int main(void)
 
 
   		//HAL_TIM_Base_Start(&htim11);
-	  HAL_TIM_Base_Start_IT(&htim11);
+	 HAL_TIM_Base_Start_IT(&htim11);
 
 	  	//if(TIM11->CNT>=999){
 		//	MessageLen = sprintf((char*)Message, "timer pelny licznik 11: %i\n\r",TIM11->CNT);
@@ -407,68 +493,21 @@ int main(void)
 	  //	}
 
 
-	  //	if(sensor_right_dist<=200){
+	  	if(sensor_right_dist<=200)
+	  	{
 
-	  		//HAL_TIM_Base_Start(&htim11);// rozpoczecie timera
-	  		//HAL_TIM_SET_COUNTER(&htim11,0);//ustawienie timera na zero
-
-	  		//uint16_t ttimer=TIM11->CNT;
-
-
-	  		// jeden licznik to 0,016384 s bo czestotliwosc to 4 mhz
+	  		//HAL_TIM_Base_Start_IT(&htim11);
+	  		flaga_startu=1;
+	  		//fun_namierz();
 
 
+		}
+	  	if(sensor_left_dist<=200)
+	  	{
+	  		flaga_startu2=1;
+	  	}
 
 
-			//MessageLen = sprintf((char*)Message, "timer start 11: %i\n\r",ttimer);
-		  	//HAL_UART_Transmit(&huart1, Message, MessageLen, 100);
-
-		  	//if(ttimer>=999){
-			//	MessageLen = sprintf((char*)Message, "timer pelny licznik 11: %i\n\r",ttimer);
-			 // 	HAL_UART_Transmit(&huart1, Message, MessageLen, 100);
-		  //	}
-
-
-
-	  		//jazda w prawo
-			//HAL_GPIO_WritePin(motor_1A_GPIO_Port, motor_1A_Pin, GPIO_PIN_SET);
-			//HAL_GPIO_WritePin(motor_2A_GPIO_Port, motor_2A_Pin, GPIO_PIN_RESET);
-
-			//JAZDA w lewo (patrzac od kierowcy
-//kom			HAL_GPIO_WritePin(motor_2B_GPIO_Port, motor_2B_Pin, GPIO_PIN_SET);
-//kom			HAL_GPIO_WritePin(motor_1B_GPIO_Port, motor_1B_Pin, GPIO_PIN_RESET);
-
-			//if(__HAL_TIM_GET_COUNTER(&htim11)>=60000){
-
-
-				//STOP
-			//	HAL_GPIO_WritePin(motor_1A_GPIO_Port, motor_1A_Pin, GPIO_PIN_SET);
-			//	HAL_GPIO_WritePin(motor_2A_GPIO_Port, motor_2A_Pin, GPIO_PIN_SET);
-			//	HAL_TIM_Base_Stop(&htim11);
-
-			//}else{
-				//STOP
-			//	HAL_GPIO_WritePin(motor_1A_GPIO_Port, motor_1A_Pin, GPIO_PIN_SET);
-			//	HAL_GPIO_WritePin(motor_2A_GPIO_Port, motor_2A_Pin, GPIO_PIN_SET);
-			//}
-
-			//uint32_t value = __HAL_TIM_GET_COUNTER(&htim11); pobranie wartosci timera
-				//HAL_TIM_SET_COUNTER(&htim11, 0);
-
-				//  if (old_value != value) {
-				//    old_value = value;
-				//    printf("value = %lu\n", value);
-				//
-
-	  //	}else{
-			//STOP
-			//HAL_GPIO_WritePin(motor_1A_GPIO_Port, motor_1A_Pin, GPIO_PIN_SET);
-			//HAL_GPIO_WritePin(motor_2A_GPIO_Port, motor_2A_Pin, GPIO_PIN_SET);
-
-			//STOP dla jazdy w lewo od kierowcy
-//kom			HAL_GPIO_WritePin(motor_1B_GPIO_Port, motor_1B_Pin, GPIO_PIN_SET);
-//kom			HAL_GPIO_WritePin(motor_2B_GPIO_Port, motor_2B_Pin, GPIO_PIN_SET);
-	  //	}
 
 
 
@@ -679,7 +718,7 @@ static void MX_TIM11_Init(void)
 
   /* USER CODE END TIM11_Init 1 */
   htim11.Instance = TIM11;
-  htim11.Init.Prescaler = 15999;
+  htim11.Init.Prescaler = 159;
   htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim11.Init.Period = 999;
   htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;

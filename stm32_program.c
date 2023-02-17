@@ -92,6 +92,10 @@ int flaga_startu=0;
 int flaga_startu2=0;
 int status;
 
+volatile static uint16_t sensor_left_dist;
+volatile static uint16_t sensor_center_dist;
+volatile static uint16_t sensor_right_dist;
+
 uint8_t Message[64];
 uint8_t MessageLen;
 
@@ -138,7 +142,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     	  	  	}
 
 
-    	  		if(ticksy>=65)
+    	  		if(ticksy>=(sensor_right_dist/10)) // ms if(ticksy>=55)
     	  		{
     	  			//STOP
     	  			MessageLen = sprintf((char*)Message, "zatrzymanie %i\n\r",ticksy);
@@ -171,7 +175,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 
 
-    	  		if(ticksy>=65)
+    	  		if(ticksy>=(sensor_left_dist/20)) //if(ticksy>=55)
     	  		{
     	  			//STOP
     	  			MessageLen = sprintf((char*)Message, "zatrzymanie %i\n\r",ticksy);
@@ -218,9 +222,7 @@ int main(void)
     uint8_t PhaseCal;
 
 
-    volatile static uint16_t sensor_left_dist;
-    volatile static uint16_t sensor_center_dist;
-    volatile static uint16_t sensor_right_dist;
+
 
   /* USER CODE END 1 */
 
@@ -493,7 +495,7 @@ int main(void)
 	  //	}
 
 
-	  	if(sensor_right_dist<=200)
+	  	if(sensor_right_dist<=500) // 20cm
 	  	{
 
 	  		//HAL_TIM_Base_Start_IT(&htim11);
@@ -502,7 +504,7 @@ int main(void)
 
 
 		}
-	  	if(sensor_left_dist<=200)
+	  	if(sensor_left_dist<=500)
 	  	{
 	  		flaga_startu2=1;
 	  	}
